@@ -1,0 +1,1405 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>STP GitHub File Manager - Professional Repository Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        * { font-family: 'Inter', sans-serif; }
+
+        .drag-over {
+            border-color: #3b82f6 !important;
+            background: rgba(59, 130, 246, 0.1) !important;
+        }
+
+        .file-item, .folder-item {
+            animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: all 0.2s ease;
+        }
+
+        .file-item:hover, .folder-item:hover {
+            transform: translateX(4px);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .context-menu { animation: fadeIn 0.15s ease; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+
+        .glass-effect {
+            background: rgba(31, 41, 55, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .gradient-border {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 2px;
+            border-radius: 12px;
+        }
+
+        .gradient-border-content {
+            background: #1f2937;
+            border-radius: 10px;
+        }
+
+        .breadcrumb-item {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .breadcrumb-item:hover { color: #60a5fa; }
+
+        .loading-spinner {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            0%   { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .modal { animation: modalSlideIn 0.3s ease; }
+
+        @keyframes modalSlideIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .selected-file {
+            background: rgba(59, 130, 246, 0.2) !important;
+            border-color: #3b82f6 !important;
+        }
+
+        .toolbar-btn { transition: all 0.2s ease; }
+        .toolbar-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        .toolbar-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .preview-content { max-height: 500px; overflow-y: auto; }
+        .preview-content::-webkit-scrollbar { width: 8px; }
+        .preview-content::-webkit-scrollbar-track { background: #1f2937; }
+        .preview-content::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        .preview-content::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+
+        /* ── Progress Bar ── */
+        .upload-progress-bar {
+            height: 6px;
+            border-radius: 3px;
+            background: #374151;
+            overflow: hidden;
+        }
+        .upload-progress-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+        }
+        .upload-progress-fill.success { background: linear-gradient(90deg, #10b981, #059669); }
+        .upload-progress-fill.error   { background: linear-gradient(90deg, #ef4444, #dc2626); }
+
+        .file-upload-row {
+            animation: slideIn 0.2s ease;
+        }
+
+        /* ── Toast ── */
+        #toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            min-width: 280px;
+            max-width: 360px;
+            padding: 14px 18px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: auto;
+            animation: toastIn 0.35s cubic-bezier(0.16,1,0.3,1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .toast.success { background: #064e3b; color: #6ee7b7; }
+        .toast.error   { background: #450a0a; color: #fca5a5; }
+        .toast.info    { background: #1e3a5f; color: #93c5fd; }
+        .toast.warning { background: #451a03; color: #fcd34d; }
+        .toast-out     { animation: toastOut 0.3s ease forwards; }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(60px) scale(0.92); }
+            to   { opacity: 1; transform: translateX(0) scale(1); }
+        }
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateX(0) scale(1); }
+            to   { opacity: 0; transform: translateX(60px) scale(0.92); }
+        }
+
+        /* ── Code editor textarea ── */
+        #createFileContent {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            tab-size: 4;
+        }
+
+        /* ── Rename input inline ── */
+        .rename-input {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid #3b82f6;
+            outline: none;
+            color: white;
+            font-weight: 600;
+            font-size: inherit;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 min-h-screen text-white">
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- Header -->
+    <header class="py-4 glass-effect sticky top-0 z-50 shadow-2xl">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
+                        <i class="fab fa-github text-2xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                            STP GitHub File Manager
+                        </h1>
+                        <p class="text-xs text-gray-400">Created by Tarik Aziz</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button id="refreshBtn" class="toolbar-btn px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition flex items-center space-x-2">
+                        <i class="fas fa-sync-alt"></i>
+                        <span class="hidden sm:inline">Refresh</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+            <!-- Sidebar -->
+            <div class="lg:col-span-1 space-y-4">
+                <div class="gradient-border">
+                    <div class="gradient-border-content p-4">
+                        <h3 class="text-lg font-bold mb-4 flex items-center">
+                            <i class="fas fa-bolt mr-2 text-yellow-400"></i>
+                            Quick Actions
+                        </h3>
+                        <div class="space-y-2">
+                            <button id="uploadFilesBtn" class="toolbar-btn w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition flex items-center justify-center space-x-2">
+                                <i class="fas fa-upload"></i>
+                                <span>Upload Files</span>
+                            </button>
+                            <button id="createFolderBtn" class="toolbar-btn w-full py-3 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition flex items-center justify-center space-x-2">
+                                <i class="fas fa-folder-plus"></i>
+                                <span>New Folder</span>
+                            </button>
+                            <button id="createFileBtn" class="toolbar-btn w-full py-3 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-semibold transition flex items-center justify-center space-x-2">
+                                <i class="fas fa-file-plus"></i>
+                                <span>New File</span>
+                            </button>
+                            <button id="deleteSelectedBtn" class="toolbar-btn w-full py-3 bg-red-600 hover:bg-red-700 rounded-lg font-semibold transition flex items-center justify-center space-x-2" disabled>
+                                <i class="fas fa-trash"></i>
+                                <span>Delete Selected</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Repository Info -->
+                <div class="gradient-border">
+                    <div class="gradient-border-content p-4">
+                        <h3 class="text-lg font-bold mb-4 flex items-center">
+                            <i class="fas fa-database mr-2 text-blue-400"></i>
+                            Repository Info
+                        </h3>
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <p class="text-gray-400 text-xs mb-1">Owner</p>
+                                <p id="sidebarOwner" class="font-semibold text-blue-400">Not configured</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 text-xs mb-1">Repository</p>
+                                <p id="sidebarRepo" class="font-semibold text-green-400">Not configured</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 text-xs mb-1">Branch</p>
+                                <p id="sidebarBranch" class="font-semibold text-purple-400">Not configured</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 text-xs mb-1">Items Selected</p>
+                                <p id="selectedCount" class="font-semibold text-yellow-400">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- View Options -->
+                <div class="gradient-border">
+                    <div class="gradient-border-content p-4">
+                        <h3 class="text-lg font-bold mb-4 flex items-center">
+                            <i class="fas fa-eye mr-2 text-purple-400"></i>
+                            View Options
+                        </h3>
+                        <div class="space-y-2">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="showHiddenFiles" class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500">
+                                <span class="text-sm">Show hidden files</span>
+                            </label>
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="compactView" class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500">
+                                <span class="text-sm">Compact view</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="lg:col-span-3 space-y-4">
+
+                <!-- Toolbar -->
+                <div class="gradient-border">
+                    <div class="gradient-border-content p-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <div id="breadcrumb" class="flex items-center space-x-2 text-sm flex-wrap">
+                                <i class="fas fa-home text-blue-400"></i>
+                                <span class="breadcrumb-item text-blue-400 font-semibold" data-path="">Root</span>
+                            </div>
+                            <button id="viewToggleBtn" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition text-sm">
+                                <i class="fas fa-th"></i>
+                            </button>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <div class="flex-1 relative">
+                                <input type="text" id="searchInput" class="w-full px-4 py-2 pl-10 bg-gray-900 border-2 border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Search files and folders...">
+                                <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            </div>
+                            <select id="sortSelect" class="px-4 py-2 bg-gray-900 border-2 border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                                <option value="name-asc">Name (A-Z)</option>
+                                <option value="name-desc">Name (Z-A)</option>
+                                <option value="size-asc">Size (Small first)</option>
+                                <option value="size-desc">Size (Large first)</option>
+                                <option value="type">Type</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File List -->
+                <div class="gradient-border">
+                    <div class="gradient-border-content p-4 min-h-[500px]">
+                        <div id="loadingIndicator" class="flex flex-col items-center justify-center py-20">
+                            <div class="loading-spinner mb-4"></div>
+                            <p class="text-gray-400">Loading repository...</p>
+                        </div>
+
+                        <div id="fileListContainer" class="hidden">
+                            <div id="fileList" class="space-y-2"></div>
+                            <div id="emptyState" class="hidden flex flex-col items-center justify-center py-20">
+                                <i class="fas fa-folder-open text-6xl text-gray-600 mb-4"></i>
+                                <p class="text-xl text-gray-400 font-semibold">This folder is empty</p>
+                                <p class="text-sm text-gray-500 mt-2">Upload files or create a new folder to get started</p>
+                            </div>
+                        </div>
+
+                        <div id="errorState" class="hidden flex flex-col items-center justify-center py-20">
+                            <i class="fas fa-exclamation-triangle text-6xl text-red-400 mb-4"></i>
+                            <p class="text-xl text-red-400 font-semibold">Failed to load repository</p>
+                            <p class="text-sm text-gray-400 mt-2 mb-4">Please check your configuration and try again</p>
+                            <button id="retryBtn" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition">Retry</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         Upload Modal
+    ══════════════════════════════════════════ -->
+    <div id="uploadModal" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
+        <div class="modal bg-gray-800 rounded-2xl max-w-3xl w-full border border-gray-700 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="bg-gradient-to-r from-blue-600 to-purple-600 p-6 rounded-t-2xl flex items-center justify-between sticky top-0">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-cloud-upload-alt text-3xl"></i>
+                    <h2 class="text-2xl font-bold">Upload Files</h2>
+                </div>
+                <button id="closeUploadBtn" class="text-white hover:text-gray-200 transition">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div id="dropZone" class="border-3 border-dashed border-gray-600 rounded-2xl p-12 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-700 transition-all bg-gray-900 mb-6">
+                    <div class="space-y-4">
+                        <div class="flex justify-center">
+                            <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                                <i class="fas fa-cloud-upload-alt text-3xl"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xl font-semibold mb-2">Drag & Drop Files Here</p>
+                            <p class="text-gray-400 mb-4">or</p>
+                            <label for="fileUploadInput" class="inline-block px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-lg cursor-pointer transition font-semibold">
+                                <i class="fas fa-folder-open mr-2"></i>Browse Files
+                            </label>
+                            <input type="file" id="fileUploadInput" multiple class="hidden">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="uploadFilesList" class="space-y-2 mb-4"></div>
+
+                <!-- Overall Progress -->
+                <div id="uploadOverallProgress" class="hidden mb-4 p-4 bg-gray-900 rounded-xl border border-gray-700">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold text-gray-300">Overall Progress</span>
+                        <span id="uploadProgressText" class="text-sm text-blue-400 font-bold">0 / 0</span>
+                    </div>
+                    <div class="upload-progress-bar">
+                        <div id="uploadOverallFill" class="upload-progress-fill" style="width:0%"></div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold mb-2">Commit Message</label>
+                    <textarea id="uploadCommitMsg" class="w-full px-4 py-3 bg-gray-900 border-2 border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none" rows="2" placeholder="Describe your changes...">Upload files via File Manager</textarea>
+                </div>
+
+                <button id="startUploadBtn" class="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-lg font-bold transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <i class="fas fa-rocket mr-2"></i>
+                    Upload <span id="uploadFileCount">0</span> File(s)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         Create Folder Modal
+    ══════════════════════════════════════════ -->
+    <div id="createFolderModal" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
+        <div class="modal bg-gray-800 rounded-2xl max-w-md w-full border border-gray-700 shadow-2xl">
+            <div class="bg-gradient-to-r from-green-600 to-emerald-600 p-6 rounded-t-2xl flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-folder-plus text-3xl"></i>
+                    <h2 class="text-2xl font-bold">Create Folder</h2>
+                </div>
+                <button id="closeFolderBtn" class="text-white hover:text-gray-200 transition">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Folder Name</label>
+                    <input type="text" id="folderNameInput" class="w-full px-4 py-3 bg-gray-900 border-2 border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="my-folder">
+                    <p class="text-xs text-gray-400 mt-1">Folder will be created in the current directory</p>
+                </div>
+                <button id="confirmCreateFolderBtn" class="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 rounded-lg font-bold transition">
+                    <i class="fas fa-check mr-2"></i>Create Folder
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         Create File Modal  (NEW)
+    ══════════════════════════════════════════ -->
+    <div id="createFileModal" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
+        <div class="modal bg-gray-800 rounded-2xl max-w-3xl w-full border border-gray-700 shadow-2xl max-h-[90vh] flex flex-col">
+            <div class="bg-gradient-to-r from-indigo-600 to-violet-600 p-6 rounded-t-2xl flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-file-code text-3xl"></i>
+                    <h2 class="text-2xl font-bold">Create New File</h2>
+                </div>
+                <button id="closeCreateFileBtn" class="text-white hover:text-gray-200 transition">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4 overflow-y-auto flex-1">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">File Name <span class="text-red-400">*</span></label>
+                        <input type="text" id="createFileName" class="w-full px-4 py-3 bg-gray-900 border-2 border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="e.g. index.html, notes.md">
+                        <p class="text-xs text-gray-400 mt-1">Will be created in: <span id="createFilePathHint" class="text-indigo-400">/root</span></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Commit Message</label>
+                        <input type="text" id="createFileCommitMsg" class="w-full px-4 py-3 bg-gray-900 border-2 border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="Create file" value="Create file via File Manager">
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-sm font-semibold">File Content</label>
+                        <span id="createFileLineCount" class="text-xs text-gray-500">0 lines</span>
+                    </div>
+                    <textarea id="createFileContent" class="w-full px-4 py-3 bg-gray-900 border-2 border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none" rows="16" placeholder="// Start typing your file content here...
+// Leave empty to create a blank file."></textarea>
+                </div>
+                <button id="confirmCreateFileBtn" class="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 rounded-lg font-bold transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-save mr-2"></i>Save File to Repository
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         Rename Modal  (NEW)
+    ══════════════════════════════════════════ -->
+    <div id="renameModal" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
+        <div class="modal bg-gray-800 rounded-2xl max-w-md w-full border border-gray-700 shadow-2xl">
+            <div class="bg-gradient-to-r from-yellow-600 to-orange-600 p-6 rounded-t-2xl flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-edit text-3xl"></i>
+                    <h2 class="text-2xl font-bold">Rename</h2>
+                </div>
+                <button id="closeRenameBtn" class="text-white hover:text-gray-200 transition">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">New Name</label>
+                    <input type="text" id="renameInput" class="w-full px-4 py-3 bg-gray-900 border-2 border-gray-700 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none" placeholder="new-name">
+                    <p class="text-xs text-gray-400 mt-1 flex items-start gap-1">
+                        <i class="fas fa-info-circle text-yellow-500 mt-0.5"></i>
+                        Files are renamed by creating a new copy and deleting the original.
+                    </p>
+                </div>
+                <button id="confirmRenameBtn" class="w-full py-3 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 rounded-lg font-bold transition">
+                    <i class="fas fa-check mr-2"></i>Rename
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         File Preview Modal
+    ══════════════════════════════════════════ -->
+    <div id="previewModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+        <div class="modal bg-gray-800 rounded-2xl max-w-5xl w-full border border-gray-700 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="bg-gradient-to-r from-purple-600 to-pink-600 p-6 rounded-t-2xl flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-file-alt text-3xl"></i>
+                    <h2 id="previewFileName" class="text-2xl font-bold">File Preview</h2>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <a id="previewDownloadBtn" href="#" target="_blank" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition">
+                        <i class="fas fa-download mr-2"></i>Download
+                    </a>
+                    <button id="closePreviewBtn" class="text-white hover:text-gray-200 transition">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="previewContent" class="p-6 overflow-y-auto flex-1 preview-content">
+                <div class="flex items-center justify-center py-20">
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         Context Menu
+    ══════════════════════════════════════════ -->
+    <div id="contextMenu" class="hidden fixed bg-gray-800 border border-gray-700 rounded-lg shadow-2xl py-2 z-50 min-w-[200px] context-menu">
+        <button class="context-menu-item w-full px-4 py-2 hover:bg-gray-700 text-left flex items-center space-x-3 transition" data-action="preview">
+            <i class="fas fa-eye text-blue-400 w-5"></i><span>Preview</span>
+        </button>
+        <button class="context-menu-item w-full px-4 py-2 hover:bg-gray-700 text-left flex items-center space-x-3 transition" data-action="download">
+            <i class="fas fa-download text-green-400 w-5"></i><span>Download</span>
+        </button>
+        <button class="context-menu-item w-full px-4 py-2 hover:bg-gray-700 text-left flex items-center space-x-3 transition" data-action="rename">
+            <i class="fas fa-edit text-yellow-400 w-5"></i><span>Rename</span>
+        </button>
+        <div class="border-t border-gray-700 my-2"></div>
+        <button class="context-menu-item w-full px-4 py-2 hover:bg-gray-700 text-left flex items-center space-x-3 transition" data-action="delete">
+            <i class="fas fa-trash text-red-400 w-5"></i><span>Delete</span>
+        </button>
+    </div>
+
+    <script>
+        // ============================================
+        // 🔧 CONFIGURATION
+        // ============================================
+        const CONFIG = {
+            GITHUB_TOKEN: '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 ',
+            REPO_OWNER: 'omprokash660-dotcom',
+            REPO_NAME: 'goa',
+            BRANCH: 'main'
+        };
+
+        // ============================================
+        // Toast Notification System
+        // ============================================
+        const Toast = {
+            show(message, type = 'info', duration = 3500) {
+                const container = document.getElementById('toast-container');
+                const icons = {
+                    success: 'fa-check-circle',
+                    error:   'fa-times-circle',
+                    info:    'fa-info-circle',
+                    warning: 'fa-exclamation-triangle'
+                };
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.innerHTML = `<i class="fas ${icons[type] || icons.info}"></i><span>${message}</span>`;
+                container.appendChild(toast);
+
+                setTimeout(() => {
+                    toast.classList.add('toast-out');
+                    setTimeout(() => toast.remove(), 300);
+                }, duration);
+            },
+            success: (msg, dur) => Toast.show(msg, 'success', dur),
+            error:   (msg, dur) => Toast.show(msg, 'error',   dur),
+            info:    (msg, dur) => Toast.show(msg, 'info',    dur),
+            warning: (msg, dur) => Toast.show(msg, 'warning', dur),
+        };
+
+        // ============================================
+        // GitHub File Manager
+        // ============================================
+        class GitHubFileManager {
+            constructor() {
+                this.config = {
+                    token:  CONFIG.GITHUB_TOKEN,
+                    owner:  CONFIG.REPO_OWNER,
+                    repo:   CONFIG.REPO_NAME,
+                    branch: CONFIG.BRANCH
+                };
+                this.currentPath   = '';
+                this.selectedItems = new Set();
+                this.allFiles      = [];
+                this.searchQuery   = '';
+                this.contextMenuTarget = null;
+                this.uploadFilesArray  = [];
+                this.renameTarget      = null;
+                this.init();
+            }
+
+            isConfigured() {
+                return this.config.token && this.config.owner && this.config.repo && this.config.branch;
+            }
+
+            async init() {
+                this.setupEventListeners();
+                this.updateUI();
+                if (this.isConfigured()) {
+                    await this.loadDirectory();
+                } else {
+                    this.showError();
+                }
+            }
+
+            // ============================================
+            // Event Listeners
+            // ============================================
+            setupEventListeners() {
+                // Upload
+                document.getElementById('uploadFilesBtn').addEventListener('click', () => this.showUploadModal());
+                document.getElementById('closeUploadBtn').addEventListener('click', () => this.hideUploadModal());
+                const dropZone  = document.getElementById('dropZone');
+                const fileInput = document.getElementById('fileUploadInput');
+
+                ['dragenter','dragover','dragleave','drop'].forEach(ev =>
+                    dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); })
+                );
+                ['dragenter','dragover'].forEach(ev =>
+                    dropZone.addEventListener(ev, () => dropZone.classList.add('drag-over'))
+                );
+                ['dragleave','drop'].forEach(ev =>
+                    dropZone.addEventListener(ev, () => dropZone.classList.remove('drag-over'))
+                );
+                dropZone.addEventListener('drop',  e => this.handleFileDrop(e));
+                dropZone.addEventListener('click', e => { if (!e.target.closest('label')) fileInput.click(); });
+                fileInput.addEventListener('change', e => this.handleFileSelect(e));
+                document.getElementById('startUploadBtn').addEventListener('click', () => this.uploadFiles());
+
+                // Create Folder
+                document.getElementById('createFolderBtn').addEventListener('click', () => this.showCreateFolderModal());
+                document.getElementById('closeFolderBtn').addEventListener('click', () => this.hideCreateFolderModal());
+                document.getElementById('confirmCreateFolderBtn').addEventListener('click', () => this.createFolder());
+                document.getElementById('folderNameInput').addEventListener('keydown', e => {
+                    if (e.key === 'Enter') this.createFolder();
+                });
+
+                // Create File
+                document.getElementById('createFileBtn').addEventListener('click', () => this.showCreateFileModal());
+                document.getElementById('closeCreateFileBtn').addEventListener('click', () => this.hideCreateFileModal());
+                document.getElementById('confirmCreateFileBtn').addEventListener('click', () => this.createFile());
+                document.getElementById('createFileContent').addEventListener('input', e => {
+                    const lines = e.target.value.split('\n').length;
+                    document.getElementById('createFileLineCount').textContent = `${lines} line${lines !== 1 ? 's' : ''}`;
+                });
+
+                // Rename
+                document.getElementById('closeRenameBtn').addEventListener('click', () => this.hideRenameModal());
+                document.getElementById('confirmRenameBtn').addEventListener('click', () => this.doRename());
+                document.getElementById('renameInput').addEventListener('keydown', e => {
+                    if (e.key === 'Enter') this.doRename();
+                });
+
+                // Preview
+                document.getElementById('closePreviewBtn').addEventListener('click', () => this.hidePreviewModal());
+
+                // Misc
+                document.getElementById('refreshBtn').addEventListener('click', () => this.loadDirectory(this.currentPath));
+                document.getElementById('deleteSelectedBtn').addEventListener('click', () => this.deleteSelected());
+                document.getElementById('retryBtn').addEventListener('click', () => this.loadDirectory());
+
+                // Search & Sort
+                document.getElementById('searchInput').addEventListener('input', e => {
+                    this.searchQuery = e.target.value.toLowerCase();
+                    this.renderFiles();
+                });
+                document.getElementById('sortSelect').addEventListener('change', () => this.renderFiles());
+
+                // Context Menu
+                document.addEventListener('click', () => this.hideContextMenu());
+                document.addEventListener('contextmenu', e => {
+                    if (!e.target.closest('.file-item') && !e.target.closest('.folder-item')) {
+                        this.hideContextMenu();
+                    }
+                });
+                document.querySelectorAll('.context-menu-item').forEach(item => {
+                    item.addEventListener('click', e => {
+                        e.stopPropagation();
+                        this.handleContextMenuAction(item.dataset.action);
+                    });
+                });
+
+                // View Options
+                document.getElementById('showHiddenFiles').addEventListener('change', () => this.renderFiles());
+                document.getElementById('compactView').addEventListener('change', () => this.renderFiles());
+
+                // ESC closes modals
+                document.addEventListener('keydown', e => {
+                    if (e.key === 'Escape') {
+                        this.hideUploadModal();
+                        this.hideCreateFolderModal();
+                        this.hideCreateFileModal();
+                        this.hideRenameModal();
+                        this.hidePreviewModal();
+                    }
+                });
+            }
+
+            // ============================================
+            // UI State
+            // ============================================
+            updateUI() {
+                document.getElementById('sidebarOwner').textContent  = this.config.owner  || 'Not configured';
+                document.getElementById('sidebarRepo').textContent   = this.config.repo   || 'Not configured';
+                document.getElementById('sidebarBranch').textContent = this.config.branch || 'Not configured';
+                document.getElementById('selectedCount').textContent = this.selectedItems.size;
+                document.getElementById('deleteSelectedBtn').disabled = this.selectedItems.size === 0;
+            }
+
+            showUploadModal() {
+                if (!this.isConfigured()) { Toast.error('Configuration error! Check credentials.'); return; }
+                document.getElementById('uploadModal').classList.remove('hidden');
+            }
+            hideUploadModal() {
+                document.getElementById('uploadModal').classList.add('hidden');
+                document.getElementById('uploadFilesList').innerHTML = '';
+                document.getElementById('fileUploadInput').value = '';
+                document.getElementById('uploadOverallProgress').classList.add('hidden');
+                document.getElementById('uploadOverallFill').style.width = '0%';
+                this.uploadFilesArray = [];
+                document.getElementById('startUploadBtn').disabled = true;
+                document.getElementById('uploadFileCount').textContent = '0';
+            }
+
+            showCreateFolderModal() {
+                if (!this.isConfigured()) { Toast.error('Configuration error! Check credentials.'); return; }
+                document.getElementById('createFolderModal').classList.remove('hidden');
+                document.getElementById('folderNameInput').value = '';
+                setTimeout(() => document.getElementById('folderNameInput').focus(), 100);
+            }
+            hideCreateFolderModal() {
+                document.getElementById('createFolderModal').classList.add('hidden');
+            }
+
+            showCreateFileModal() {
+                if (!this.isConfigured()) { Toast.error('Configuration error! Check credentials.'); return; }
+                document.getElementById('createFileModal').classList.remove('hidden');
+                document.getElementById('createFileName').value = '';
+                document.getElementById('createFileContent').value = '';
+                document.getElementById('createFileLineCount').textContent = '0 lines';
+                document.getElementById('createFileCommitMsg').value = 'Create file via File Manager';
+                const hint = this.currentPath ? `/${this.currentPath}` : '/root';
+                document.getElementById('createFilePathHint').textContent = hint;
+                setTimeout(() => document.getElementById('createFileName').focus(), 100);
+            }
+            hideCreateFileModal() {
+                document.getElementById('createFileModal').classList.add('hidden');
+            }
+
+            showRenameModal(file) {
+                this.renameTarget = file;
+                document.getElementById('renameModal').classList.remove('hidden');
+                const input = document.getElementById('renameInput');
+                input.value = file.name;
+                setTimeout(() => { input.focus(); input.select(); }, 100);
+            }
+            hideRenameModal() {
+                document.getElementById('renameModal').classList.add('hidden');
+                this.renameTarget = null;
+            }
+
+            showPreviewModal(file) {
+                document.getElementById('previewModal').classList.remove('hidden');
+                document.getElementById('previewFileName').textContent = file.name;
+                document.getElementById('previewDownloadBtn').href = file.download_url;
+                this.loadFilePreview(file);
+            }
+            hidePreviewModal() {
+                document.getElementById('previewModal').classList.add('hidden');
+            }
+
+            showContextMenu(e, item) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.contextMenuTarget = item;
+                const menu = document.getElementById('contextMenu');
+                menu.style.left = e.pageX + 'px';
+                menu.style.top  = e.pageY + 'px';
+                menu.classList.remove('hidden');
+
+                // Hide preview/download for folders
+                const previewBtn  = menu.querySelector('[data-action="preview"]');
+                const downloadBtn = menu.querySelector('[data-action="download"]');
+                previewBtn.style.display  = item.type === 'file' ? '' : 'none';
+                downloadBtn.style.display = item.type === 'file' ? '' : 'none';
+
+                setTimeout(() => {
+                    const rect = menu.getBoundingClientRect();
+                    if (rect.right  > window.innerWidth)  menu.style.left = (e.pageX - rect.width)  + 'px';
+                    if (rect.bottom > window.innerHeight)  menu.style.top  = (e.pageY - rect.height) + 'px';
+                }, 0);
+            }
+            hideContextMenu() {
+                document.getElementById('contextMenu').classList.add('hidden');
+                this.contextMenuTarget = null;
+            }
+
+            handleContextMenuAction(action) {
+                if (!this.contextMenuTarget) return;
+                const f = this.contextMenuTarget;
+                switch (action) {
+                    case 'preview':  if (f.type === 'file') this.showPreviewModal(f); break;
+                    case 'download': if (f.type === 'file') window.open(f.download_url, '_blank'); break;
+                    case 'delete':   this.deleteFile(f); break;
+                    case 'rename':   this.showRenameModal(f); break;
+                }
+                this.hideContextMenu();
+            }
+
+            // ============================================
+            // GitHub API
+            // ============================================
+            async apiRequest(endpoint, options = {}) {
+                const url = `https://api.github.com/${endpoint}`;
+                const headers = {
+                    'Authorization': `token ${this.config.token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    ...options.headers
+                };
+                const response = await fetch(url, { ...options, headers });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.message || 'API request failed');
+                }
+                return response.json();
+            }
+
+            async loadDirectory(path = '') {
+                if (!this.isConfigured()) { this.showError(); return; }
+                this.currentPath = path;
+                this.selectedItems.clear();
+                this.showLoading();
+                try {
+                    const data = await this.apiRequest(
+                        `repos/${this.config.owner}/${this.config.repo}/contents/${path}?ref=${this.config.branch}`
+                    );
+                    this.allFiles = Array.isArray(data) ? data : [data];
+                    this.renderFiles();
+                    this.updateBreadcrumb();
+                    this.hideLoading();
+                    this.updateUI();
+                } catch (error) {
+                    console.error('Error loading directory:', error);
+                    this.showError();
+                }
+            }
+
+            // ============================================
+            // File Operations
+            // ============================================
+            async createFolder() {
+                const name = document.getElementById('folderNameInput').value.trim();
+                if (!name) { Toast.warning('Please enter a folder name.'); return; }
+
+                const btn = document.getElementById('confirmCreateFolderBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating...';
+
+                const path = this.currentPath ? `${this.currentPath}/${name}/.gitkeep` : `${name}/.gitkeep`;
+                try {
+                    await this.apiRequest(
+                        `repos/${this.config.owner}/${this.config.repo}/contents/${path}`,
+                        {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ message: `Create folder: ${name}`, content: btoa(''), branch: this.config.branch })
+                        }
+                    );
+                    this.hideCreateFolderModal();
+                    await this.loadDirectory(this.currentPath);
+                    Toast.success(`Folder "${name}" created successfully!`);
+                } catch (error) {
+                    Toast.error('Failed to create folder: ' + error.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-check mr-2"></i>Create Folder';
+                }
+            }
+
+            async createFile() {
+                const name    = document.getElementById('createFileName').value.trim();
+                const content = document.getElementById('createFileContent').value;
+                const msg     = document.getElementById('createFileCommitMsg').value.trim() || 'Create file';
+
+                if (!name) { Toast.warning('Please enter a file name.'); return; }
+
+                const btn = document.getElementById('confirmCreateFileBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+
+                const filePath = this.currentPath ? `${this.currentPath}/${name}` : name;
+                // UTF-8 safe base64
+                const b64 = btoa(unescape(encodeURIComponent(content)));
+
+                try {
+                    // Check if file exists
+                    let sha = null;
+                    try {
+                        const existing = await this.apiRequest(
+                            `repos/${this.config.owner}/${this.config.repo}/contents/${filePath}?ref=${this.config.branch}`
+                        );
+                        sha = existing.sha;
+                    } catch (_) { /* new file */ }
+
+                    await this.apiRequest(
+                        `repos/${this.config.owner}/${this.config.repo}/contents/${filePath}`,
+                        {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ message: msg, content: b64, branch: this.config.branch, ...(sha && { sha }) })
+                        }
+                    );
+
+                    this.hideCreateFileModal();
+                    await this.loadDirectory(this.currentPath);
+                    Toast.success(`File "${name}" created successfully!`);
+                } catch (error) {
+                    Toast.error('Failed to create file: ' + error.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-save mr-2"></i>Save File to Repository';
+                }
+            }
+
+            async deleteFile(file) {
+                if (!confirm(`Are you sure you want to delete "${file.name}"?`)) return;
+                try {
+                    await this.apiRequest(
+                        `repos/${this.config.owner}/${this.config.repo}/contents/${file.path}`,
+                        {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ message: `Delete ${file.name}`, sha: file.sha, branch: this.config.branch })
+                        }
+                    );
+                    await this.loadDirectory(this.currentPath);
+                    Toast.success(`"${file.name}" deleted.`);
+                } catch (error) {
+                    Toast.error('Failed to delete: ' + error.message);
+                }
+            }
+
+            async deleteSelected() {
+                if (this.selectedItems.size === 0) return;
+                if (!confirm(`Delete ${this.selectedItems.size} item(s)?`)) return;
+
+                const files = [...this.selectedItems].map(p => this.allFiles.find(f => f.path === p)).filter(Boolean);
+                let ok = 0, fail = 0;
+                for (const file of files) {
+                    try {
+                        await this.apiRequest(
+                            `repos/${this.config.owner}/${this.config.repo}/contents/${file.path}`,
+                            {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ message: `Delete ${file.name}`, sha: file.sha, branch: this.config.branch })
+                            }
+                        );
+                        ok++;
+                    } catch (_) { fail++; }
+                }
+                this.selectedItems.clear();
+                await this.loadDirectory(this.currentPath);
+                if (fail === 0) Toast.success(`${ok} item(s) deleted.`);
+                else Toast.warning(`${ok} deleted, ${fail} failed.`);
+            }
+
+            async doRename() {
+                const file    = this.renameTarget;
+                const newName = document.getElementById('renameInput').value.trim();
+                if (!file || !newName || newName === file.name) {
+                    Toast.warning('Please enter a different name.');
+                    return;
+                }
+
+                const btn = document.getElementById('confirmRenameBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Renaming...';
+
+                const dir     = file.path.includes('/') ? file.path.substring(0, file.path.lastIndexOf('/')) : '';
+                const newPath = dir ? `${dir}/${newName}` : newName;
+
+                try {
+                    if (file.type === 'file') {
+                        // 1. Fetch content
+                        const meta = await this.apiRequest(
+                            `repos/${this.config.owner}/${this.config.repo}/contents/${file.path}?ref=${this.config.branch}`
+                        );
+                        // 2. Create at new path
+                        await this.apiRequest(
+                            `repos/${this.config.owner}/${this.config.repo}/contents/${newPath}`,
+                            {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    message: `Rename ${file.name} → ${newName}`,
+                                    content: meta.content.replace(/\n/g, ''),
+                                    branch: this.config.branch
+                                })
+                            }
+                        );
+                        // 3. Delete old
+                        await this.apiRequest(
+                            `repos/${this.config.owner}/${this.config.repo}/contents/${file.path}`,
+                            {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ message: `Remove old: ${file.name}`, sha: meta.sha, branch: this.config.branch })
+                            }
+                        );
+                        Toast.success(`Renamed to "${newName}"`);
+                    } else {
+                        Toast.warning('Folder rename requires moving all contents — use GitHub directly for folders.');
+                    }
+                    this.hideRenameModal();
+                    await this.loadDirectory(this.currentPath);
+                } catch (error) {
+                    Toast.error('Rename failed: ' + error.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-check mr-2"></i>Rename';
+                }
+            }
+
+            // ============================================
+            // Upload with Progress
+            // ============================================
+            handleFileDrop(e) {
+                this.displayUploadFiles(Array.from(e.dataTransfer.files));
+            }
+            handleFileSelect(e) {
+                this.displayUploadFiles(Array.from(e.target.files));
+            }
+
+            displayUploadFiles(files) {
+                this.uploadFilesArray = files;
+                const container = document.getElementById('uploadFilesList');
+                container.innerHTML = '';
+
+                files.forEach((file, index) => {
+                    const div = document.createElement('div');
+                    div.id = `upload-row-${index}`;
+                    div.className = 'file-upload-row flex items-center justify-between bg-gray-900 p-3 rounded-lg border-2 border-gray-700';
+                    div.innerHTML = `
+                        <div class="flex items-center space-x-3 flex-1 min-w-0">
+                            <div class="text-2xl flex-shrink-0">${this.getFileIcon(file.name)}</div>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold text-sm truncate">${file.name}</p>
+                                <p class="text-xs text-gray-400">${this.formatFileSize(file.size)}</p>
+                                <div class="upload-progress-bar mt-1 hidden" id="prog-bar-${index}">
+                                    <div class="upload-progress-fill" id="prog-fill-${index}" style="width:0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 flex-shrink-0">
+                            <span id="prog-status-${index}" class="text-xs text-gray-500 w-20 text-right"></span>
+                            <button onclick="manager.removeUploadFile(${index})" id="remove-btn-${index}" class="w-8 h-8 flex items-center justify-center bg-red-600 hover:bg-red-700 rounded transition">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+
+                document.getElementById('uploadFileCount').textContent = files.length;
+                document.getElementById('startUploadBtn').disabled = files.length === 0;
+            }
+
+            removeUploadFile(index) {
+                this.uploadFilesArray.splice(index, 1);
+                this.displayUploadFiles(this.uploadFilesArray);
+            }
+
+            async uploadFiles() {
+                if (!this.uploadFilesArray || this.uploadFilesArray.length === 0) return;
+
+                const commitMsg  = document.getElementById('uploadCommitMsg').value.trim() || 'Upload files';
+                const startBtn   = document.getElementById('startUploadBtn');
+                const total      = this.uploadFilesArray.length;
+                const progBox    = document.getElementById('uploadOverallProgress');
+                const progFill   = document.getElementById('uploadOverallFill');
+                const progText   = document.getElementById('uploadProgressText');
+
+                startBtn.disabled = true;
+                startBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Uploading...';
+                progBox.classList.remove('hidden');
+
+                let done = 0, successCount = 0, failCount = 0;
+
+                for (let i = 0; i < this.uploadFilesArray.length; i++) {
+                    const file    = this.uploadFilesArray[i];
+                    const bar     = document.getElementById(`prog-bar-${i}`);
+                    const fill    = document.getElementById(`prog-fill-${i}`);
+                    const status  = document.getElementById(`prog-status-${i}`);
+                    const remBtn  = document.getElementById(`remove-btn-${i}`);
+                    const row     = document.getElementById(`upload-row-${i}`);
+
+                    bar.classList.remove('hidden');
+                    if (remBtn) remBtn.style.display = 'none';
+                    status.textContent = 'Reading…';
+                    fill.style.width = '20%';
+
+                    try {
+                        const content  = await this.readFileAsBase64(file);
+                        const filePath = this.currentPath ? `${this.currentPath}/${file.name}` : file.name;
+                        fill.style.width = '50%';
+                        status.textContent = 'Uploading…';
+
+                        let sha = null;
+                        try {
+                            const existing = await this.apiRequest(
+                                `repos/${this.config.owner}/${this.config.repo}/contents/${filePath}?ref=${this.config.branch}`
+                            );
+                            sha = existing.sha;
+                        } catch (_) {}
+
+                        fill.style.width = '75%';
+
+                        await this.apiRequest(
+                            `repos/${this.config.owner}/${this.config.repo}/contents/${filePath}`,
+                            {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ message: commitMsg, content, branch: this.config.branch, ...(sha && { sha }) })
+                            }
+                        );
+
+                        fill.style.width = '100%';
+                        fill.classList.add('success');
+                        status.innerHTML = '<i class="fas fa-check-circle text-green-400"></i>';
+                        if (row) row.style.borderColor = '#10b981';
+                        successCount++;
+                    } catch (error) {
+                        fill.style.width = '100%';
+                        fill.classList.add('error');
+                        status.innerHTML = '<i class="fas fa-times-circle text-red-400"></i>';
+                        if (row) row.style.borderColor = '#ef4444';
+                        failCount++;
+                        console.error('Upload error:', error);
+                    }
+
+                    done++;
+                    const pct = Math.round((done / total) * 100);
+                    progFill.style.width = pct + '%';
+                    progText.textContent = `${done} / ${total}`;
+                }
+
+                startBtn.disabled = false;
+                startBtn.innerHTML = `<i class="fas fa-rocket mr-2"></i>Upload <span id="uploadFileCount">${this.uploadFilesArray.length}</span> File(s)`;
+
+                if (failCount === 0) {
+                    Toast.success(`✓ ${successCount} file(s) uploaded successfully!`);
+                    setTimeout(() => { this.hideUploadModal(); this.loadDirectory(this.currentPath); }, 1500);
+                } else {
+                    Toast.warning(`${successCount} uploaded, ${failCount} failed.`);
+                    await this.loadDirectory(this.currentPath);
+                }
+            }
+
+            readFileAsBase64(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload  = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            // ============================================
+            // Rendering
+            // ============================================
+            renderFiles() {
+                const container  = document.getElementById('fileList');
+                const emptyState = document.getElementById('emptyState');
+                const sortValue  = document.getElementById('sortSelect').value;
+                const showHidden = document.getElementById('showHiddenFiles').checked;
+                const compact    = document.getElementById('compactView').checked;
+
+                let files = this.allFiles.filter(f => {
+                    if (!showHidden && f.name.startsWith('.')) return false;
+                    if (this.searchQuery && !f.name.toLowerCase().includes(this.searchQuery)) return false;
+                    return true;
+                });
+
+                files = this.sortFiles(files, sortValue);
+                container.innerHTML = '';
+
+                if (files.length === 0) {
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+                emptyState.classList.add('hidden');
+
+                files.forEach(file => {
+                    const div = document.createElement('div');
+                    const isSel = this.selectedItems.has(file.path);
+
+                    div.className = `${file.type === 'dir' ? 'folder-item' : 'file-item'} ${isSel ? 'selected-file' : ''} flex items-center justify-between bg-gray-800 ${compact ? 'p-2' : 'p-4'} rounded-lg border-2 border-gray-700 cursor-pointer`;
+
+                    div.innerHTML = `
+                        <div class="flex items-center space-x-3 flex-1 min-w-0">
+                            <div class="${compact ? 'text-xl' : 'text-2xl'}">${file.type === 'dir' ? '📁' : this.getFileIcon(file.name)}</div>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold ${compact ? 'text-sm' : ''} truncate">${file.name}</p>
+                                ${!compact && file.type === 'file' ? `<p class="text-xs text-gray-400">${this.formatFileSize(file.size)}</p>` : ''}
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 flex-shrink-0">
+                            ${file.type === 'file' ? `
+                                <button class="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 rounded transition" title="Preview" onclick="event.stopPropagation(); manager.showPreviewModal(${JSON.stringify(file).replace(/"/g, '&quot;')})">
+                                    <i class="fas fa-eye text-sm"></i>
+                                </button>
+                            ` : ''}
+                            <button class="w-8 h-8 flex items-center justify-center bg-yellow-600 hover:bg-yellow-700 rounded transition" title="Rename" onclick="event.stopPropagation(); manager.showRenameModal(${JSON.stringify(file).replace(/"/g, '&quot;')})">
+                                <i class="fas fa-edit text-sm"></i>
+                            </button>
+                            <button class="w-8 h-8 flex items-center justify-center bg-red-700 hover:bg-red-800 rounded transition" title="Delete" onclick="event.stopPropagation(); manager.deleteFile(${JSON.stringify(file).replace(/"/g, '&quot;')})">
+                                <i class="fas fa-trash text-sm"></i>
+                            </button>
+                        </div>
+                    `;
+
+                    div.addEventListener('click', e => {
+                        if (e.target.closest('button')) return;
+                        if (file.type === 'dir') {
+                            this.loadDirectory(file.path);
+                        } else {
+                            if (this.selectedItems.has(file.path)) this.selectedItems.delete(file.path);
+                            else this.selectedItems.add(file.path);
+                            this.renderFiles();
+                            this.updateUI();
+                        }
+                    });
+
+                    div.addEventListener('dblclick', e => {
+                        e.preventDefault();
+                        if (file.type === 'dir') this.loadDirectory(file.path);
+                        else this.showPreviewModal(file);
+                    });
+
+                    div.addEventListener('contextmenu', e => this.showContextMenu(e, file));
+                    container.appendChild(div);
+                });
+            }
+
+            sortFiles(files, sortValue) {
+                const [sortKey, order] = sortValue.split('-');
+                return files.sort((a, b) => {
+                    if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+                    let cmp = 0;
+                    if (sortKey === 'name') cmp = a.name.localeCompare(b.name);
+                    else if (sortKey === 'size') cmp = (a.size || 0) - (b.size || 0);
+                    else if (sortKey === 'type') cmp = (a.name.split('.').pop() || '').localeCompare(b.name.split('.').pop() || '');
+                    return order === 'desc' ? -cmp : cmp;
+                });
+            }
+
+            updateBreadcrumb() {
+                const bc    = document.getElementById('breadcrumb');
+                const parts = this.currentPath.split('/').filter(p => p);
+                bc.innerHTML = '<i class="fas fa-home text-blue-400"></i>';
+
+                const root = document.createElement('span');
+                root.className = 'breadcrumb-item text-blue-400 font-semibold';
+                root.dataset.path = '';
+                root.textContent = 'Root';
+                root.addEventListener('click', () => this.loadDirectory(''));
+                bc.appendChild(root);
+
+                let cur = '';
+                parts.forEach((part, i) => {
+                    cur += (cur ? '/' : '') + part;
+                    const sep = document.createElement('i');
+                    sep.className = 'fas fa-chevron-right text-gray-600 text-xs';
+                    bc.appendChild(sep);
+                    const span = document.createElement('span');
+                    span.className = 'breadcrumb-item ' + (i === parts.length - 1 ? 'text-white font-semibold' : 'text-gray-400');
+                    span.textContent = part;
+                    const p = cur;
+                    span.addEventListener('click', () => this.loadDirectory(p));
+                    bc.appendChild(span);
+                });
+            }
+
+            async loadFilePreview(file) {
+                const previewContent = document.getElementById('previewContent');
+                previewContent.innerHTML = '<div class="flex items-center justify-center py-20"><div class="loading-spinner"></div></div>';
+                try {
+                    const response = await fetch(file.download_url);
+                    const content  = await response.text();
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    const imageExts = ['jpg','jpeg','png','gif','svg','webp'];
+                    const codeExts  = ['js','ts','html','css','json','py','java','cpp','c','go','rs','php','rb','sh','yaml','yml','toml','md','txt','xml','sql'];
+
+                    if (imageExts.includes(ext)) {
+                        previewContent.innerHTML = `<img src="${file.download_url}" class="max-w-full h-auto rounded-lg mx-auto">`;
+                    } else if (codeExts.includes(ext)) {
+                        previewContent.innerHTML = `<pre class="bg-gray-900 p-4 rounded-lg overflow-x-auto text-sm"><code>${this.escapeHtml(content)}</code></pre>`;
+                    } else {
+                        previewContent.innerHTML = `
+                            <div class="text-center py-10">
+                                <i class="fas fa-file text-6xl text-gray-600 mb-4"></i>
+                                <p class="text-gray-400 mb-4">Preview not available for this file type</p>
+                                <a href="${file.download_url}" target="_blank" class="inline-block px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition">
+                                    <i class="fas fa-download mr-2"></i>Download File
+                                </a>
+                            </div>`;
+                    }
+                } catch (error) {
+                    previewContent.innerHTML = `
+                        <div class="text-center py-10">
+                            <i class="fas fa-exclamation-triangle text-6xl text-red-400 mb-4"></i>
+                            <p class="text-red-400">Failed to load preview</p>
+                            <p class="text-sm text-gray-400 mt-2">${error.message}</p>
+                        </div>`;
+                }
+            }
+
+            // ============================================
+            // Loading States
+            // ============================================
+            showLoading() {
+                document.getElementById('loadingIndicator').classList.remove('hidden');
+                document.getElementById('fileListContainer').classList.add('hidden');
+                document.getElementById('errorState').classList.add('hidden');
+            }
+            hideLoading() {
+                document.getElementById('loadingIndicator').classList.add('hidden');
+                document.getElementById('fileListContainer').classList.remove('hidden');
+            }
+            showError() {
+                document.getElementById('loadingIndicator').classList.add('hidden');
+                document.getElementById('fileListContainer').classList.add('hidden');
+                document.getElementById('errorState').classList.remove('hidden');
+            }
+
+            // ============================================
+            // Utilities
+            // ============================================
+            getFileIcon(filename) {
+                const ext = filename.split('.').pop().toLowerCase();
+                const icons = {
+                    'jpg':'🖼️','jpeg':'🖼️','png':'🖼️','gif':'🖼️','svg':'🎨','webp':'🖼️',
+                    'pdf':'📄','doc':'📝','docx':'📝','txt':'📝','md':'📋',
+                    'zip':'📦','rar':'📦','7z':'📦','tar':'📦','gz':'📦',
+                    'mp3':'🎵','wav':'🎵','mp4':'🎬','avi':'🎬',
+                    'js':'📜','ts':'📘','html':'🌐','css':'🎨','json':'📋',
+                    'py':'🐍','java':'☕','cpp':'⚙️','go':'🔵','rs':'🦀',
+                    'sh':'💻','yaml':'⚙️','yml':'⚙️','sql':'🗃️','xml':'📰'
+                };
+                return icons[ext] || '📄';
+            }
+
+            formatFileSize(bytes) {
+                if (!bytes || bytes === 0) return '0 B';
+                const k = 1024, sizes = ['B','KB','MB','GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+            }
+
+            escapeHtml(text) {
+                const d = document.createElement('div');
+                d.textContent = text;
+                return d.innerHTML;
+            }
+        }
+
+        const manager = new GitHubFileManager();
+    </script>
+
+    <footer class="mt-12 pb-8 text-center text-gray-500">
+        <p class="text-sm">Made with <i class="fas fa-heart text-red-500"></i> by <span class="text-blue-400 font-semibold">Tarik Aziz</span></p>
+        <p class="text-xs mt-2"><i class="fab fa-github mr-1"></i>STP GitHub File Manager • Secure • Professional</p>
+    </footer>
+</body>
+</html>
